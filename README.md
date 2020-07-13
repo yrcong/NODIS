@@ -24,7 +24,7 @@ python train_rel.py -m sgcls -order random -b 6 -clip 5 -p 100 -lr 1e-4 -ngpu 1 
 ```
 + For SGDET: 
 ```python
-python train_rel.py -m sgdet -order random -b 6 -clip 5 -p 100 -lr 1e-4 -ngpu 1 -ckpt checkpoints/vgdet/vg-24.tar -save_dir checkpoints/ -nepoch 20
+python train_rel.py -m sgdet -order random -b 6 -clip 5 -p 100 -lr 1e-4 -ngpu 1 -ckpt $CHECKPOINT -save_dir checkpoints/ -nepoch 20
 ```
 or [you can download the pretrained NODIS checkpoint here](https://drive.google.com/open?id=1kOPX7Fj-QW5rMr7HyRgL2h4Tb2RZlCj9)
 
