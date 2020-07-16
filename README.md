@@ -6,11 +6,11 @@ Here is the pytorch code for our paper [NODIS: Neural Ordinary Differential Scen
 ## Setup
 1. Install python and pytorch if you haven't. Our code is based on python 3.6 and pytorch 0.4.1.
 
-2. Compile something.
+2. Compile: run ```make``` in the main directory
 
 3. Download Neural ODE module [here](https://github.com/rtqichen/torchdiffeq/tree/master/torchdiffeq)
 
-3. For a fair comparison we use the pretrained object detector checkpoint provided by [neural-motifs](https://github.com/rowanz/neural-motifs). [You can download it here directly](https://drive.google.com/open?id=1xXIcROgv-u1Yq7ILIyWAndVBQxvP3jUD) and save it under *checkpoints/vgdet/*
+4. For a fair comparison we use the pretrained object detector checkpoint provided by [neural-motifs](https://github.com/rowanz/neural-motifs). [You can download it here directly](https://drive.google.com/open?id=1xXIcROgv-u1Yq7ILIyWAndVBQxvP3jUD) and save it under *checkpoints/vgdet/*
 
 ## Training
 You can train the NODIS model with train_rel.py. We trained the model on a GTX 1080Ti.
