@@ -5,7 +5,7 @@ WARNING: I haven't tested this in a while. It's possible that some later feature
 """
 
 from dataloaders.visual_genome import VGDataLoader, VG
-from lib.NODIS import RelModel
+from lib.NODIS import NODIS
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -19,7 +19,7 @@ from collections import defaultdict
 from PIL import Image, ImageDraw, ImageFont
 import os
 from functools import reduce
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+
 conf = ModelConfig()
 train, val, test = VG.splits(num_val_im=conf.val_size)
 if conf.test:
@@ -31,14 +31,10 @@ train_loader, val_loader = VGDataLoader.splits(train, val, mode='rel',
                                                num_gpus=conf.num_gpus)
 
 
-detector = RelModel(classes=train.ind_to_classes, rel_classes=train.ind_to_predicates,
+detector = NODIS(classes=train.ind_to_classes, rel_classes=train.ind_to_predicates,
                     num_gpus=conf.num_gpus, mode=conf.mode, require_overlap_det=True,
                     use_resnet=conf.use_resnet, order=conf.order,
-                    use_proposals=conf.use_proposals,
-                    pass_in_obj_feats_to_decoder=conf.pass_in_obj_feats_to_decoder,
-                    pass_in_obj_feats_to_edge=conf.pass_in_obj_feats_to_edge,
-                    rec_dropout=conf.rec_dropout
-                    )
+                    use_proposals=conf.use_proposals)
 
 detector.cuda()
 ckpt = torch.load(conf.ckpt)
