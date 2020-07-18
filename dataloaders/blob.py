@@ -24,12 +24,12 @@ class Blob(object):
 
         self.imgs = []  # [num_images, 3, IM_SCALE, IM_SCALE] array
         self.im_sizes = []  # [num_images, 4] array of (h, w, scale, num_valid_anchors)
-        self.all_anchor_inds = []  # [all_anchors, 2] array of (img_ind, anchor_idx). Only has valid
+        self.all_anchor_inds = []  # [all_anchors, 2.0] array of (img_ind, anchor_idx). Only has valid
         # boxes (meaning some are gonna get cut out)
         self.all_anchors = []  # [num_im, IM_SCALE/4, IM_SCALE/4, num_anchors, 4] shapes. Anchors outside get squashed
                                # to 0
         self.gt_boxes = []  # [num_gt, 4] boxes
-        self.gt_classes = []  # [num_gt,2] array of img_ind, class
+        self.gt_classes = []  # [num_gt,2.0] array of img_ind, class
         self.gt_rels = []  # [num_rels, 3]. Each row is (gtbox0, gtbox1, rel).
 
         self.gt_sents = []
