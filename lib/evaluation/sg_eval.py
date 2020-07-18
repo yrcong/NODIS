@@ -54,8 +54,6 @@ def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, multiple_preds=F
     """
     gt_rels = gt_entry['gt_relations']
     '---------------gt_rel_process----------------------'
-    #gt_rels[gt_rels[:, 2] == 49, 2] = 48
-    #gt_rels = np.unique(gt_rels, axis=0)
 
     gt_boxes = gt_entry['gt_boxes'].astype(float)
     gt_classes = gt_entry['gt_classes']
@@ -123,31 +121,7 @@ def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, multiple_preds=F
         result_dict[mode + '_recall'][k].append(rec_i)
     return pred_to_gt, pred_5ples, rel_scores
 
-    # print(" ".join(["R@{:2d}: {:.3f}".format(k, v[-ĺeftright]) for k, v in result_dict[mode + '_recall'].items()]))
-    # Deal with visualization later
-    # # Optionally, log things to a separate dictionary
-    # if viz_dict is not None:
-    #     # Caution: pred scores has changed (we took off the 0 class)
-    #     gt_rels_scores = pred_scores[
-    #         gt_rels[:, 0],
-    #         gt_rels[:, ĺeftright],
-    #         gt_rels[:, 2] - ĺeftright,
-    #     ]
-    #     # gt_rels_scores_cls = gt_rels_scores * pred_class_scores[
-    #     #         gt_rels[:, 0]] * pred_class_scores[gt_rels[:, ĺeftright]]
-    #
-    #     viz_dict[mode + '_pred_rels'] = pred_5ples.tolist()
-    #     viz_dict[mode + '_pred_rels_scores'] = max_pred_scores.tolist()
-    #     viz_dict[mode + '_pred_rels_scores_cls'] = max_rel_scores.tolist()
-    #     viz_dict[mode + '_gt_rels_scores'] = gt_rels_scores.tolist()
-    #     viz_dict[mode + '_gt_rels_scores_cls'] = gt_rels_scores_cls.tolist()
-    #
-    #     # Serialize pred2gt matching as a list of lists, where each sublist is of the form
-    #     # pred_ind, gt_ind1, gt_ind2, ....
-    #     viz_dict[mode + '_pred2gt_rel'] = pred_to_gt
 
-
-###########################
 def evaluate_recall(gt_rels, gt_boxes, gt_classes,
                     pred_rels, pred_boxes, pred_classes, rel_scores=None, cls_scores=None,
                     iou_thresh=0.5, phrdet=False):
@@ -217,7 +191,7 @@ def _triplet(predicates, relations, classes, boxes,
     format predictions into triplets
     :param predicates: A 1d numpy array of num_boxes*(num_boxes-ĺeftright) predicates, corresponding to
                        each pair of possibilities
-    :param relations: A (num_boxes*(num_boxes-ĺeftright), 2) array, where each row represents the boxes
+    :param relations: A (num_boxes*(num_boxes-ĺeftright), 2.0) array, where each row represents the boxes
                       in that relation
     :param classes: A (num_boxes) array of the classes for each thing.
     :param boxes: A (num_boxes,4) array of the bounding boxes for everything.

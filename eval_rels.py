@@ -1,14 +1,7 @@
-import matplotlib.pyplot as plt
-import matplotlib
-from PIL import Image, ImageDraw
-import matplotlib.patches as patches
-from lib.fpn.box_utils import bbox_preds, center_size, bbox_overlaps
-
 
 from dataloaders.visual_genome import VGDataLoader, VG
 import numpy as np
 import torch
-
 
 from config import ModelConfig
 from lib.pytorch_misc import optimistic_restore
@@ -18,51 +11,34 @@ from config import BOX_SCALE, IM_SCALE
 import dill as pkl
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 conf = ModelConfig()
-from lib.rel_model_sgdet import RelModel
-'''
-if conf.model == 'motifnet':
-    from lib.rel_model_sgdet import RelModel################
-elif conf.model == 'stanford':
-    from lib.rel_model_stanford import RelModelStanford as RelModel
-else:
-    raise ValueError()
-'''
+from lib.NODIS import NODIS
+
 train, val, test = VG.splits(num_val_im=0, filter_duplicate_rels=True,
-                          use_proposals=conf.use_proposals,
-                          filter_non_overlap=conf.mode == 'sgdet')
+                             use_proposals=conf.use_proposals,
+                             filter_non_overlap=conf.mode == 'sgdet')
 if conf.test:
     val = test
+
 train_loader, val_loader = VGDataLoader.splits(train, val, mode='rel',
                                                batch_size=conf.batch_size,
                                                num_workers=conf.num_workers,
                                                num_gpus=conf.num_gpus)
 
-detector = RelModel(classes=train.ind_to_classes, rel_classes=train.ind_to_predicates,
-                    num_gpus=conf.num_gpus, mode=conf.mode, require_overlap_det=True,
-                    use_resnet=conf.use_resnet, order=conf.order,
-                    use_proposals=conf.use_proposals,
-                    pass_in_obj_feats_to_decoder=conf.pass_in_obj_feats_to_decoder,
-                    pass_in_obj_feats_to_edge=conf.pass_in_obj_feats_to_edge,
-                    rec_dropout=conf.rec_dropout
-                    )
+detector = NODIS(classes=train.ind_to_classes, rel_classes=train.ind_to_predicates,
+                 num_gpus=conf.num_gpus, mode=conf.mode, require_overlap_det=True,
+                 use_resnet=conf.use_resnet, order=conf.order,
+                 use_proposals=conf.use_proposals)
 
 
 detector.cuda()
 ckpt = torch.load(conf.ckpt)
-#conf_matrix = np.zeros((51,51))
-#conf_matrix = np.zeros((151, 151))
 conf_matrix = np.zeros((3,1))
 optimistic_restore(detector, ckpt['state_dict'])
-# if conf.mode == 'sgdet':
-#     det_ckpt = torch.load('checkpoints/new_vgdet/vg-19.tar')['state_dict']
-#     detector.detector.bbox_fc.weight.data.copy_(det_ckpt['bbox_fc.weight'])
-#     detector.detector.bbox_fc.bias.data.copy_(det_ckpt['bbox_fc.bias'])
-#     detector.detector.score_fc.weight.data.copy_(det_ckpt['score_fc.weight'])
-#     detector.detector.score_fc.bias.data.copy_(det_ckpt['score_fc.bias'])
 
 all_pred_entries = []
+
+
 def val_batch(batch_num, b, evaluator, thrs=(20, 50, 100)):
 
     det_res = detector[b]
@@ -76,7 +52,7 @@ def val_batch(batch_num, b, evaluator, thrs=(20, 50, 100)):
             'gt_boxes': val.gt_boxes[batch_num + i].copy(),
         }
         assert np.all(objs_i[rels_i[:,0]] > 0) and np.all(objs_i[rels_i[:,1]] > 0)
-        # assert np.all(rels_i[:,2] > 0)
+        # assert np.all(rels_i[:,2.0] > 0)
 
         pred_entry = {
             'pred_boxes': boxes_i * BOX_SCALE/IM_SCALE,
@@ -86,76 +62,6 @@ def val_batch(batch_num, b, evaluator, thrs=(20, 50, 100)):
             'rel_scores': pred_scores_i,
         }
         all_pred_entries.append(pred_entry)
-        '''
-        if 78 in list(gt_entry['gt_classes']):
-            for i, j in enumerate(list(gt_entry['gt_classes'])):
-                if j == 78:
-                    conf_matrix[0, 0] += 1
-        '''
-
-        '''
-        bbox = gt_entry['gt_boxes'] / b.im_sizes[0, 0, 2] / (BOX_SCALE / IM_SCALE)
-        if 78 in list(gt_entry['gt_classes']):
-            for i, j in enumerate(list(gt_entry['gt_classes'])):
-                if j == 149:
-                    if 126 in list(gt_entry['gt_classes']):
-                        for m, n in enumerate(list(gt_entry['gt_classes'])):
-                            if n == 126:#table
-                                if bbox_overlaps(torch.tensor([bbox[i]]), torch.tensor([bbox[m]]))>0.3:
-                                    conf_matrix[0,0] += 1
-            for i, j in enumerate(list(gt_entry['gt_classes'])):
-                if j == 149:
-                    if 87 in list(gt_entry['gt_classes']):
-                        for m, n in enumerate(list(gt_entry['gt_classes'])):
-                            if n == 87:#pant
-                                if bbox_overlaps(torch.tensor([bbox[i]]), torch.tensor([bbox[m]]))>0.3:
-                                    conf_matrix[1,0] += 1
-            for i, j in enumerate(list(gt_entry['gt_classes'])):
-                if j == 149:
-                    if 61 in list(gt_entry['gt_classes']):
-                        for m, n in enumerate(list(gt_entry['gt_classes'])):
-                            if n == 61:#head
-                                if bbox_overlaps(torch.tensor([bbox[i]]), torch.tensor([bbox[m]]))>0.3:
-                                    conf_matrix[2,0] += 1
-
-        '''
-
-
-
-
-
-        '''
-        t = False
-        bbox = gt_entry['gt_boxes']/b.im_sizes[0,0,2]/(BOX_SCALE/IM_SCALE)
-        if 149 in list(gt_entry['gt_classes']):
-            img = Image.open(val.filenames[batch_num])
-            ax = plt.subplot(1,1,1)
-            ax.imshow(img)
-            for i,j in enumerate(list(gt_entry['gt_classes'])):
-                if j == 149 and objs_i[i]==78:
-                    t = True
-                    rect = patches.Rectangle((bbox[i][0],bbox[i][1]),
-                                             bbox[i][2]-bbox[i][0],bbox[i][3]-bbox[i][1],
-                                             linewidth=2,edgecolor='blue',fill=False)
-                    ax.add_patch(rect)
-            if t:
-                plt.show()
-                print(1)
-            plt.clf()
-        '''
-
-        '''
-        for i in range(gt_entry['gt_classes'].shape[0]):
-            for j in range(pred_entry['pred_classes'].shape[0]):
-                conf_matrix[gt_entry['gt_classes'][i],pred_entry['pred_classes'][j]] += 1
-
-        predicted_rel = pred_entry['rel_scores'][:, 1:].argmax(1) + 1
-        for i in range(gt_entry['gt_relations'].shape[0]):
-            for j in range(pred_entry['pred_rel_inds'].shape[0]):
-                if np.array_equal(gt_entry['gt_relations'][i,:2],rels_i[j]):
-                    conf_matrix[gt_entry['gt_relations'][i,2], predicted_rel[j]] += 1
-        '''
-
 
         evaluator[conf.mode].evaluate_scene_graph_entry(
             gt_entry,
@@ -163,7 +69,7 @@ def val_batch(batch_num, b, evaluator, thrs=(20, 50, 100)):
         )
 
 
-evaluator = BasicSceneGraphEvaluator.all_modes(multiple_preds=conf.multi_pred)
+evaluator = BasicSceneGraphEvaluator.all_modes(multiple_preds=False)#conf.multi_pred
 if conf.cache is not None and os.path.exists(conf.cache):
     print("Found {}! Loading from it".format(conf.cache))
     with open(conf.cache,'rb') as f:

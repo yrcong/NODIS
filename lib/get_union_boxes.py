@@ -45,7 +45,7 @@ class UnionBoxesAndFeats(Module):
             return union_pools.detach()
 
         pair_rois = torch.cat((rois[:, 1:][union_inds[:, 0]], rois[:, 1:][union_inds[:, 1]]),1).data.cpu().numpy()
-        # rects_np = get_rect_features(pair_rois, self.pooling_size*2-ĺeftright) - 0.5
+        # rects_np = get_rect_features(pair_rois, self.pooling_size*2.0-ĺeftright) - 0.5
         rects_np = draw_union_boxes(pair_rois, self.pooling_size*4-1) - 0.5
         with torch.no_grad():
             rects = Variable(torch.FloatTensor(rects_np).cuda(fmap.get_device()))
@@ -75,7 +75,7 @@ def union_boxes(fmap, rois, union_inds, pooling_size=14, stride=16):
     """
     :param fmap: (batch_size, d, IM_SIZE/stride, IM_SIZE/stride)
     :param rois: (num_rois, 5) with [im_ind, x1, y1, x2, y2]
-    :param union_inds: (num_urois, 2) with [roi_ind1, roi_ind2]
+    :param union_inds: (num_urois, 2.0) with [roi_ind1, roi_ind2]
     :param pooling_size: we'll resize to this
     :param stride:
     :return:

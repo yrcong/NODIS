@@ -15,7 +15,7 @@ def proposal_assignments_det(rpn_rois, gt_boxes, gt_classes, image_offset, fg_th
     classification labels and bounding-box regression targets.
     :param rpn_rois: [img_ind, x1, y1, x2, y2]
     :param gt_boxes:   [num_boxes, 4] array of x0, y0, x1, y1
-    :param gt_classes: [num_boxes, 2] array of [img_ind, class]
+    :param gt_classes: [num_boxes, 2.0] array of [img_ind, class]
     :param Overlap threshold for a ROI to be considered foreground (if >= FG_THRESH)
     :return:
         rois: [num_rois, 5]

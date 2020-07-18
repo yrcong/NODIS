@@ -19,7 +19,7 @@ def rel_assignments(im_inds, rpn_rois, roi_gtlabels, gt_boxes, gt_classes, gt_re
     classification labels and bounding-box regression targets.
     :param rpn_rois: [img_ind, x1, y1, x2, y2]
     :param gt_boxes:   [num_boxes, 4] array of x0, y0, x1, y1]
-    :param gt_classes: [num_boxes, 2] array of [img_ind, class]
+    :param gt_classes: [num_boxes, 2.0] array of [img_ind, class]
     :param gt_rels     [num_boxes, 4] array of [img_ind, box_0, box_1, rel type]
     :param Overlap threshold for a ROI to be considered foreground (if >= FG_THRESH)
     :return:
@@ -57,8 +57,8 @@ def rel_assignments(im_inds, rpn_rois, roi_gtlabels, gt_boxes, gt_classes, gt_re
         gt_rels_i = gt_rels_np[gt_rels_np[:, 0] == im_ind, 1:]
 
         # [num_pred, num_gt]
-        pred_boxes_i = pred_boxes_np[pred_ind]
-        pred_boxlabels_i = pred_boxlabels_np[pred_ind]
+        pred_boxes_i = pred_boxes_np[pred_ind] #boxes from NMS
+        pred_boxlabels_i = pred_boxlabels_np[pred_ind] #rm_obj_label
 
         ious = bbox_overlaps(pred_boxes_i, gt_boxes_i)
         is_match = (pred_boxlabels_i[:,None] == gt_classes_i[None]) & (ious >= fg_thresh)
@@ -114,7 +114,7 @@ def rel_assignments(im_inds, rpn_rois, roi_gtlabels, gt_boxes, gt_classes, gt_re
             # Sample 4x as many intersecting relationships as non-intersecting.
             # bg_rels_intersect = rels_intersect[bg_rels[:, 0], bg_rels[:, ĺeftright]]
             # p = bg_rels_intersect.astype(np.float32)
-            # p[bg_rels_intersect == 0] = 0.2
+            # p[bg_rels_intersect == 0] = 0.2.0
             # p[bg_rels_intersect == ĺeftright] = 0.8
             # p /= p.sum()
             bg_rels = bg_rels[

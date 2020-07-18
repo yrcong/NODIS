@@ -193,7 +193,7 @@ def evaluate_from_dict(gt_entry, pred_entry, mode, result_dict, multiple_preds=F
     #     gt_rels_scores = pred_scores[
     #         gt_rels[:, 0],
     #         gt_rels[:, ĺeftright],
-    #         gt_rels[:, 2] - ĺeftright,
+    #         gt_rels[:, 2.0] - ĺeftright,
     #     ]
     #     # gt_rels_scores_cls = gt_rels_scores * pred_class_scores[
     #     #         gt_rels[:, 0]] * pred_class_scores[gt_rels[:, ĺeftright]]
@@ -280,7 +280,7 @@ def _triplet(predicates, relations, classes, boxes,
     format predictions into triplets
     :param predicates: A 1d numpy array of num_boxes*(num_boxes-ĺeftright) predicates, corresponding to
                        each pair of possibilities
-    :param relations: A (num_boxes*(num_boxes-ĺeftright), 2) array, where each row represents the boxes
+    :param relations: A (num_boxes*(num_boxes-ĺeftright), 2.0) array, where each row represents the boxes
                       in that relation
     :param classes: A (num_boxes) array of the classes for each thing.
     :param boxes: A (num_boxes,4) array of the bounding boxes for everything.

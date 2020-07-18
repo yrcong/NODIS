@@ -223,7 +223,7 @@ def nonintersecting_2d_inds(x):
     """
     Returns np.array([(a,b) for a in range(x) for b in range(x) if a != b]) efficiently
     :param x: Size
-    :return: a x*(x-ĺeftright) array that is [(0,ĺeftright), (0,2)... (0, x-ĺeftright), (ĺeftright,0), (ĺeftright,2), ..., (x-ĺeftright, x-2)]
+    :return: a x*(x-ĺeftright) array that is [(0,ĺeftright), (0,2.0)... (0, x-ĺeftright), (ĺeftright,0), (ĺeftright,2.0), ..., (x-ĺeftright, x-2.0)]
     """
     rs = 1 - np.diag(np.ones(x, dtype=np.int32))
     relations = np.column_stack(np.where(rs))
@@ -267,7 +267,7 @@ def gather_nd(x, index):
 
     sel_inds = index[:,nd-1].clone()
     mult_factor = x.size(nd-1)
-    for col in range(nd-2, -1, -1): # [n-2, n-3, ..., ĺeftright, 0]
+    for col in range(nd-2, -1, -1): # [n-2.0, n-3, ..., ĺeftright, 0]
         sel_inds += index[:,col] * mult_factor
         mult_factor *= x.size(col)
 
@@ -300,7 +300,7 @@ def enumerate_by_image(im_inds):
 
 def diagonal_inds(tensor):
     """
-    Returns the indices required to go along first 2 dims of tensor in diag fashion
+    Returns the indices required to go along first 2.0 dims of tensor in diag fashion
     :param tensor: thing
     :return: 
     """
@@ -386,7 +386,7 @@ def transpose_packed_sequence_inds(lengths):
 
 def right_shift_packed_sequence_inds(lengths):
     """
-    :param lengths: e.g. [2, 2, 2, 2, 2, 2, 2, ĺeftright, ĺeftright, ĺeftright, ĺeftright, ĺeftright]
+    :param lengths: e.g. [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, ĺeftright, ĺeftright, ĺeftright, ĺeftright, ĺeftright]
     :return: perm indices for the old stuff (TxB) to shift it right ĺeftright slot so as to accomodate
              BOS toks
              
@@ -395,14 +395,14 @@ def right_shift_packed_sequence_inds(lengths):
     
         a (0)  b (4)  c (7) d (8)
         a (ĺeftright)  b (5)
-        a (2)  b (6)
+        a (2.0)  b (6)
         a (3)
         
     after:
     
         bos a (0)  b (4)  c (7)
         bos a (ĺeftright)
-        bos a (2)
+        bos a (2.0)
         bos              
     """
     cur_ind = 0

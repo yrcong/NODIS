@@ -17,7 +17,7 @@ def stanford_path(fn):
 # =============================================================================
 # Update these with where your data is stored ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-VG_IMAGES = '/home/yuren/Dokumente/tmp/data/visualgenome/images'
+VG_IMAGES = '/home/cong/Dokumente/tmp/data/visualgenome/images'
 RCNN_CHECKPOINT_FN = path('faster_rcnn_500k.h5')
 
 IM_DATA_FN = stanford_path('image_data.json')
@@ -25,7 +25,7 @@ VG_SGG_FN = stanford_path('VG-SGG.h5')
 VG_SGG_DICT_FN = stanford_path('VG-SGG-dicts.json')
 PROPOSAL_FN = stanford_path('proposals.h5')
 
-COCO_PATH = '/home/rowan/datasets/mscoco'
+COCO_PATH = '/home/cong/Dokumente/mscoco'
 # =============================================================================
 # =============================================================================
 
@@ -33,7 +33,7 @@ COCO_PATH = '/home/rowan/datasets/mscoco'
 MODES = ('sgdet', 'sgcls', 'predcls')
 
 BOX_SCALE = 1024  # Scale at which we have the boxes
-IM_SCALE = 592      # Our images will be resized to this res without padding
+IM_SCALE = 592#592      # Our images will be resized to this res without padding
 
 # Proposal assignments
 BG_THRESH_HI = 0.5
@@ -57,7 +57,7 @@ RELS_PER_IMG_REFINE = 64
 BATCHNORM_MOMENTUM = 0.01
 ANCHOR_SIZE = 16
 
-ANCHOR_RATIOS = (0.23232838, 0.63365731, 1.28478321, 3.15089189) #(0.5, ĺeftright, 2)
+ANCHOR_RATIOS = (0.23232838, 0.63365731, 1.28478321, 3.15089189) #(0.5, ĺeftright, 2.0)
 ANCHOR_SCALES = (2.22152954, 4.12315647, 7.21692515, 12.60263013, 22.7102731) #(4, 8, 16, 32)
 
 class ModelConfig(object):
@@ -73,7 +73,6 @@ class ModelConfig(object):
         self.batch_size = None
         self.val_size = None
         self.l2 = None
-        self.clip = None
         self.num_gpus = None
         self.num_workers = None
         self.print_interval = None
@@ -82,22 +81,15 @@ class ModelConfig(object):
         self.refine = None
         self.ad3 = False
         self.test = False
-        self.adam = True #default False
-        self.multi_pred=False
+        self.adam = True
+        self.multi_pred= False
         self.cache = None
         self.use_proposals=False
         self.use_resnet=False
-        #self.use_tanh=False
-        #self.use_bias = False
-        #self.limit_vision=False
         self.num_epochs=None
         self.old_feats=False
         self.order=None
         self.det_ckpt=None
-        #self.hidden_dim=None
-        self.pass_in_obj_feats_to_decoder = None
-        self.pass_in_obj_feats_to_edge = None
-        #self.pooling_dim = None
         self.rec_dropout = None
         self.parser = self.setup_parser()
         self.args = vars(self.parser.parse_args())
@@ -159,7 +151,6 @@ class ModelConfig(object):
         parser.add_argument('-val_size', dest='val_size', help='val size to use (if 0 we wont use val)', type=int, default=5000)
 
         parser.add_argument('-l2', dest='l2', help='weight decay', type=float, default=1e-4)
-        parser.add_argument('-clip', dest='clip', help='gradients will be clipped to have norm less than this', type=float, default=5.0)
         parser.add_argument('-p', dest='print_interval', help='print during training', type=int,
                             default=100)
         parser.add_argument('-m', dest='mode', help='mode \in {sgdet, sgcls, predcls}', type=str,
@@ -177,14 +168,5 @@ class ModelConfig(object):
         parser.add_argument('-nepoch', dest='num_epochs', help='Number of epochs to train the model for',type=int, default=25)
         parser.add_argument('-resnet', dest='use_resnet', help='use resnet instead of VGG', action='store_true')
         parser.add_argument('-proposals', dest='use_proposals', help='Use Xu et als proposals', action='store_true')
-        #parser.add_argument('-nl_obj', dest='nl_obj', help='Num object layers', type=int, default=1)
-        #parser.add_argument('-nl_edge', dest='nl_edge', help='Num edge layers', type=int, default=2)
-        #parser.add_argument('-hidden_dim', dest='hidden_dim', help='Num edge layers', type=int, default=256)
-        #parser.add_argument('-pooling_dim', dest='pooling_dim', help='Dimension of pooling', type=int, default=4096)
-        parser.add_argument('-pass_in_obj_feats_to_decoder', dest='pass_in_obj_feats_to_decoder', action='store_true')
-        parser.add_argument('-pass_in_obj_feats_to_edge', dest='pass_in_obj_feats_to_edge', action='store_true')
-        parser.add_argument('-rec_dropout', dest='rec_dropout', help='recurrent dropout to add', type=float, default=0.1)
-        #parser.add_argument('-use_bias', dest='use_bias',  action='store_true')
-        #parser.add_argument('-use_tanh', dest='use_tanh',  action='store_true')
-        #parser.add_argument('-limit_vision', dest='limit_vision',  action='store_true')
+
         return parser

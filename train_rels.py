@@ -1,7 +1,3 @@
-"""
-Training script for scene graph detection. Integrated with my faster rcnn setup
-"""
-
 from dataloaders.visual_genome import VGDataLoader, VG
 import numpy as np
 from torch import optim
@@ -19,64 +15,36 @@ from lib.pytorch_misc import print_para
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 conf = ModelConfig()
-from lib.rel_model_sgdet import RelModel
-"""
-if conf.model == 'motifnet':
-    from lib.rel_model_sgdet import RelModel
-elif conf.model == 'stanford':
-    from lib.rel_model_stanford import RelModelStanford as RelModel
-else:
-    raise ValueError()
-"""
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+from lib.NODIS import NODIS
 
-train, val, test = VG.splits(num_val_im=0, filter_duplicate_rels=True,
-                          use_proposals=conf.use_proposals,
-                          filter_non_overlap=conf.mode == 'sgdet')
-val = test
+train, val, test = VG.splits(num_val_im=5000, filter_duplicate_rels=True,
+                             use_proposals=conf.use_proposals,
+                            filter_non_overlap=conf.mode == 'sgdet')
+
 train_loader, val_loader = VGDataLoader.splits(train, val, mode='rel',
                                                batch_size=conf.batch_size,
                                                num_workers=conf.num_workers,
                                                num_gpus=conf.num_gpus)
 
-detector = RelModel(classes=train.ind_to_classes, rel_classes=train.ind_to_predicates,
-                    num_gpus=conf.num_gpus, mode=conf.mode, require_overlap_det=True,
-                    use_resnet=conf.use_resnet, order=conf.order,
-                    use_proposals=conf.use_proposals,
-                    pass_in_obj_feats_to_decoder=conf.pass_in_obj_feats_to_decoder,
-                    pass_in_obj_feats_to_edge=conf.pass_in_obj_feats_to_edge,
-                    rec_dropout=conf.rec_dropout
-                    )
+detector = NODIS(classes=train.ind_to_classes, rel_classes=train.ind_to_predicates,
+                 num_gpus=conf.num_gpus, mode=conf.mode, require_overlap_det=True,
+                 use_resnet=conf.use_resnet, order=conf.order,
+                 use_proposals=conf.use_proposals)
 
 # Freeze the detector
 for n, param in detector.detector.named_parameters():
     param.requires_grad = False
-# Don't freeze the vgg
-'''
-for n, param in detector.detector.named_parameters():
-    if not n.startswith('features'):
-        param.requires_grad = False
-'''
 
 print(print_para(detector), flush=True)
 
-
-
 def get_optim(lr):
-    # Lower the learning rate on the VGG fully connected layers by ĺeftright/10th. It's a hack, but it helps
-    # stabilize the models.
-    #vgg_params = [p for n,p in detector.detector.named_parameters() if n.startswith('features') and p.requires_grad]
-    # here is 2 fc-layers compressing obj-features and send them to obj-classifier
 
     fc_params = [p for n,p in detector.named_parameters() if n.startswith('roi_fmap') and p.requires_grad]
     non_fc_params = [p for n,p in detector.named_parameters() if not n.startswith('roi_fmap') and not n.startswith('detector.features')
                      and p.requires_grad]
     params = [{'params': fc_params, 'lr': lr / 10.0}, {'params': non_fc_params}]
-              #{'params': vgg_params, 'lr': lr/ 10.0}]
 
-    #params = [p for n,p in detector.named_parameters() if p.requires_grad]
-
-    if True:
+    if conf.adam:
         optimizer = optim.Adam(params, weight_decay=conf.l2, lr=1e-4, eps=1e-3) #1e-4
     else:
         optimizer = optim.SGD(params, weight_decay=conf.l2, lr=lr, momentum=0.9)
@@ -84,7 +52,6 @@ def get_optim(lr):
     scheduler = ReduceLROnPlateau(optimizer, 'max', patience=3, factor=0.1,
                                   verbose=True, threshold=0.0001, threshold_mode='abs', cooldown=1)
     return optimizer, scheduler
-
 
 ckpt = torch.load(conf.ckpt)
 if conf.ckpt.split('-')[-2].split('/')[-1] == 'vgrel':
@@ -98,11 +65,6 @@ else:
     start_epoch = -1
     optimistic_restore(detector.detector, ckpt['state_dict'])
 
-    #detector.roi_fmap[ĺeftright][0].weight.data.copy_(ckpt['state_dict']['roi_fmap.0.weight'])
-    #detector.roi_fmap[ĺeftright][3].weight.data.copy_(ckpt['state_dict']['roi_fmap.3.weight'])
-    #detector.roi_fmap[ĺeftright][0].bias.data.copy_(ckpt['state_dict']['roi_fmap.0.bias'])
-    #detector.roi_fmap[ĺeftright][3].bias.data.copy_(ckpt['state_dict']['roi_fmap.3.bias'])
-
     detector.roi_fmap_obj[0].weight.data.copy_(ckpt['state_dict']['roi_fmap.0.weight'])
     detector.roi_fmap_obj[3].weight.data.copy_(ckpt['state_dict']['roi_fmap.3.weight'])
     detector.roi_fmap_obj[0].bias.data.copy_(ckpt['state_dict']['roi_fmap.0.bias'])
@@ -110,21 +72,17 @@ else:
 
 detector.cuda()
 
-
 def train_epoch(epoch_num):
-    #file1 = open('/home/yuren/Dokumente/neural-motifs-master/loss/order/leftright/class_epoch{:2d}.txt'.format(epoch_num),'w')############
-    #file2 = open('/home/yuren/Dokumente/neural-motifs-master/loss/order/leftright/rel_epoch{:2d}.txt'.format(epoch_num),'w')  ############
+
     detector.train()
     tr = []
     start = time.time()
     for b, batch in enumerate(train_loader):
-        tr.append(train_batch(batch, verbose=b % (conf.print_interval*10) == 0)) #b == 0))
 
+        tr.append(train_batch(batch, verbose=b % (conf.print_interval*10) == 0)) #b == 0))
+        #F.interpolate(F.interpolate(batch.imgs, scale_factor=0.25), scale_factor=4)
         if b % conf.print_interval == 0 and b >= conf.print_interval:
             mn = pd.concat(tr[-conf.print_interval:], axis=1).mean(1)
-
-            #file1.write(str(mn['class_loss']) + ',')#####################
-            #file2.write(str(mn['rel_loss']) + ',')#####################
 
             time_per_batch = (time.time() - start) / conf.print_interval
             print("\ne{:2d}b{:5d}/{:5d} {:.3f}s/batch, {:.1f}m/epoch".format(
@@ -133,18 +91,15 @@ def train_epoch(epoch_num):
             print('-----------', flush=True)
             start = time.time()
 
-    #file1.close()
-    #file2.close()
 
     return pd.concat(tr, axis=1)
-
 
 def train_batch(b, verbose=False):
     """
     :param b: contains:
           :param imgs: the image, [batch_size, 3, IM_SIZE, IM_SIZE]
           :param all_anchors: [num_anchors, 4] the boxes of all anchors that we'll be using
-          :param all_anchor_inds: [num_anchors, 2] array of the indices into the concatenated
+          :param all_anchor_inds: [num_anchors, 2.0] array of the indices into the concatenated
                                   RPN feature vector that give us all_anchors,
                                   each one (img_ind, fpn_idx)
           :param im_sizes: a [batch_size, 4] numpy array of (h, w, scale, num_good_anchors) for each image.
@@ -155,27 +110,22 @@ def train_batch(b, verbose=False):
           :param train_anchor_inds: a [num_train, 5] array of indices for the anchors that will
                                     be used to compute the training loss (img_ind, fpn_idx)
           :param gt_boxes: [num_gt, 4] GT boxes over the batch.
-          :param gt_classes: [num_gt, 2] gt boxes where each one is (img_id, class)
+          :param gt_classes: [num_gt, 2.0] gt boxes where each one is (img_id, class)
     :return:
     """
-    result = detector[b]
-
-    losses = {}
-    losses['class_loss'] = F.cross_entropy(result.rm_obj_dists, result.rm_obj_labels)
-    losses['rel_loss'] = (F.cross_entropy(result.rel_dists, result.rel_labels[:, -1]))
-    #losses['rel_loss'] = rankingloss(result.ranking_dists, result.ranking_labels)
-    loss = sum(losses.values())
 
     optimizer.zero_grad()
+    result = detector[b]
+    losses = {}
+    losses['class_loss'] = F.cross_entropy(result.rm_obj_dists, result.rm_obj_labels)
+    losses['rel_loss'] = F.cross_entropy(result.rel_dists, result.rel_labels[:, -1])
+    loss = sum(losses.values())
     loss.backward()
-    #clip_grad_norm(
-    #    [(n, p) for n, p in detector.named_parameters() if p.grad is not None],
-    #    max_norm=conf.clip, verbose=verbose, clip=True)
+
     losses['total'] = loss
     optimizer.step()
     res = pd.Series({x: y.item() for x, y in losses.items()})
     return res
-
 
 def val_epoch():
     detector.eval()
@@ -184,7 +134,6 @@ def val_epoch():
         val_batch(conf.num_gpus * val_b, batch, evaluator)
     evaluator[conf.mode].print_stats()
     return np.mean(evaluator[conf.mode].result_dict[conf.mode + '_recall'][50])
-
 
 def val_batch(batch_num, b, evaluator):
     with torch.no_grad():
@@ -213,44 +162,17 @@ def val_batch(batch_num, b, evaluator):
                 pred_entry,
             )
 
-#file = open('/home/yuren/Dokumente/neural-motifs-master/loss/order/leftright/re50.txt','w')###################
-
 print("Training starts now!")
 optimizer, scheduler = get_optim(conf.lr * conf.num_gpus * conf.batch_size)
 for epoch in range(start_epoch + 1, start_epoch + 1 + conf.num_epochs):
 
     rez = train_epoch(epoch)
-    if conf.mode == 'sgdet':
-        #validation after 2 epoch
-        if epoch%2 == 0:
-            mAp = val_epoch()
-            #file.write(str(round(mAp, 4)) + ',')  #####################
-            print("overall{:2d}: ({:.3f})\n{}".format(epoch, rez.mean(1)['total'], rez.mean(1)), flush=True)
-            if conf.save_dir is not None:
-                torch.save({
-                    'epoch': epoch,
-                    'state_dict': detector.state_dict(), #{k:v for k,v in detector.state_dict().items() if not k.startswith('detector.')},
-                    # 'optimizer': optimizer.state_dict(),
-                }, os.path.join(conf.save_dir, '{}-{}-{:.4f}.tar'.format('vgrel', epoch, mAp)))
-            scheduler.step(mAp)
-    else:
-        if epoch % 2 == 0:
-            mAp = val_epoch()####################
-            #file.write(str(round(mAp,4))+',')#####################
-            print("overall{:2d}: ({:.3f})\n{}".format(epoch, rez.mean(1)['total'], rez.mean(1)), flush=True)
-            if conf.save_dir is not None:
-                torch.save({
-                    'epoch': epoch,
-                    'state_dict': detector.state_dict(),
-                # {k:v for k,v in detector.state_dict().items() if not k.startswith('detector.')},
-                    # 'optimizer': optimizer.state_dict(),
-                }, os.path.join(conf.save_dir, '{}-{}-{:.4f}.tar'.format('vgrel', epoch, mAp)))
-            scheduler.step(mAp)
+    print("overall{:2d}: ({:.3f})\n{}".format(epoch, rez.mean(1)['total'], rez.mean(1)), flush=True)
 
-
-
-    '''
-    if any([pg['lr'] <= (conf.lr * conf.num_gpus * conf.batch_size)/99.0 for pg in optimizer.param_groups]):
-        print("exiting training early", flush=True)
-        break
-        '''
+    mAp = val_epoch()
+    print("overall{:2d}: ({:.3f})\n{}".format(epoch, rez.mean(1)['total'], rez.mean(1)), flush=True)
+    if conf.save_dir is not None:
+        torch.save({
+            'epoch': epoch,
+            'state_dict': detector.state_dict()}, os.path.join(conf.save_dir, '{}-{}-{:.4f}.tar'.format('vgrel', epoch, mAp)))
+    scheduler.step(mAp)

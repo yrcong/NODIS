@@ -24,7 +24,7 @@ def filter_dets(boxes, obj_scores, obj_classes, rel_inds, pred_scores):
     :param boxes: [num_box, topk, 4] if bbox regression else [num_box, 4]
     :param obj_scores: [num_box] probabilities for the scores
     :param obj_classes: [num_box] class labels for the topk
-    :param rel_inds: [num_rel, 2] TENSOR consisting of (im_ind0, im_ind1)
+    :param rel_inds: [num_rel, 2.0] TENSOR consisting of (im_ind0, im_ind1)
     :param pred_scores: [topk, topk, num_rel, num_predicates]
     :param use_nms: True if use NMS to filter dets.
     :return: boxes, objs, rels, pred_scores

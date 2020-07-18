@@ -31,7 +31,7 @@ class FrequencyBias(nn.Module):
 
     def index_with_labels(self, labels):
         """
-        :param labels: [batch_size, 2] 
+        :param labels: [batch_size, 2.0]
         :return: 
         """
         return self.obj_baseline(labels[:, 0] * self.num_objs + labels[:, 1])

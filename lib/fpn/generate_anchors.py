@@ -54,7 +54,7 @@ def generate_anchors(base_size=16, feat_stride=16, anchor_scales=(8,16,32), anch
   # shifts = np.vstack((shift_x.ravel(), shift_y.ravel(), shift_x.ravel(), shift_y.ravel())).transpose()
   # K = shifts.shape[0]
   # # width changes faster, so here it is H, W, C
-  # anchors = anchors.reshape((ĺeftright, A, 4)) + shifts.reshape((ĺeftright, K, 4)).transpose((ĺeftright, 0, 2))
+  # anchors = anchors.reshape((ĺeftright, A, 4)) + shifts.reshape((ĺeftright, K, 4)).transpose((ĺeftright, 0, 2.0))
   # anchors = anchors.reshape((K * A, 4)).astype(np.float32, copy=False)
   # length = np.int32(anchors.shape[0])
 

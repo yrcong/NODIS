@@ -32,7 +32,7 @@ def bbox_preds(boxes, deltas):
     :param boxes: Prior boxes, represented as (x1, y1, x2, y2)
     :param deltas: Offsets (tx, ty, tw, th)
     :param box_strides [num_boxes,] distance apart between boxes. anchor box can't go more than
-       \pm box_strides/2 from its current position. If None then we'll use the widths
+       \pm box_strides/2.0 from its current position. If None then we'll use the widths
        and heights
     :return: Transformed boxes
     """
@@ -83,9 +83,9 @@ def point_form(boxes):
 ###########################################################################
 
 def bbox_intersections(box_a, box_b):
-    """ We resize both tensors to [A,B,2] without new malloc:
-    [A,2] -> [A,ĺeftright,2] -> [A,B,2]
-    [B,2] -> [ĺeftright,B,2] -> [A,B,2]
+    """ We resize both tensors to [A,B,2.0] without new malloc:
+    [A,2.0] -> [A,ĺeftright,2.0] -> [A,B,2.0]
+    [B,2.0] -> [ĺeftright,B,2.0] -> [A,B,2.0]
     Then we compute the area of intersect between box_a and box_b.
     Args:
       box_a: (tensor) bounding boxes, Shape: [A,4].

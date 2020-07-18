@@ -24,8 +24,8 @@ from lib.surgery import filter_dets
 from lib.word_vectors import obj_edge_vectors
 from lib.fpn.roi_align.functions.roi_align import RoIAlignFunction
 import math
-from torchdiffeq import odeint
-
+from lib.ODE import odeBlock, odeFunc1, odeFunc2
+import time
 
 def filter_det(scores, boxes, start_ind=0, max_per_img=100, thresh=0.001, pre_nms_topn=6000,
                post_nms_topn=300, nms_thresh=0.3, nms_filter_duplicates=True):
@@ -129,17 +129,14 @@ def _sort_by_score(im_inds, scores):
 MODES = ('sgdet', 'sgcls', 'predcls')
 
 
-class LinearizedContext(nn.Module):
+class O_NODE(nn.Module):
     """
     Module for computing the object contexts and edge contexts
     """
 
     def __init__(self, classes, rel_classes, mode='sgdet',
-                 embed_dim=200, obj_dim=2048,
-                 dropout_rate=0.2, order='confidence',
-                 pass_in_obj_feats_to_decoder=True,
-                 pass_in_obj_feats_to_edge=True):
-        super(LinearizedContext, self).__init__()
+                 embed_dim=200, obj_dim=2048, order='confidence'):
+        super(O_NODE, self).__init__()
         self.classes = classes
         self.rel_classes = rel_classes
         assert mode in MODES
@@ -148,9 +145,6 @@ class LinearizedContext(nn.Module):
         self.embed_dim = embed_dim
 
         self.obj_dim = obj_dim
-        self.dropout_rate = dropout_rate
-        self.pass_in_obj_feats_to_decoder = pass_in_obj_feats_to_decoder
-        self.pass_in_obj_feats_to_edge = pass_in_obj_feats_to_edge
 
         #----------add sget nms
         self.nms_filter_duplicates = True
@@ -165,8 +159,6 @@ class LinearizedContext(nn.Module):
         self.obj_embed = nn.Embedding(self.num_classes, self.embed_dim)
         self.obj_embed.weight.data = embed_vecs.clone()
 
-        # self.obj_embed2 = nn.Embedding(self.num_classes, self.embed_dim)#no use
-        # self.obj_embed2.weight.data = embed_vecs.clone()
 
         # This probably doesn't help it much
         self.pos_embed = nn.Sequential(*[
@@ -190,7 +182,7 @@ class LinearizedContext(nn.Module):
         cxcywh = center_size(box_priors)
         if self.order == 'size':
             sizes = cxcywh[:, 2] * cxcywh[:, 3]
-            # sizes = (box_priors[:, 2] - box_priors[:, 0] + 1) * (box_priors[:, 3] - box_priors[:, 1] + 1)
+            # sizes = (box_priors[:, 2.0] - box_priors[:, 0] + 1) * (box_priors[:, 3] - box_priors[:, 1] + 1)
             assert sizes.min() > 0.0
             scores = sizes / (sizes.max() + 1)
         elif self.order == 'confidence':
@@ -277,7 +269,7 @@ class LinearizedContext(nn.Module):
         pos_embed = self.pos_embed(Variable(center_size(box_priors)))
         obj_pre_rep = torch.cat((obj_fmaps, obj_embed, pos_embed), 1)
 
-        # UNSURE WHAT TO DO HERE
+
         if self.mode == 'predcls':
             obj_dists2 = Variable(to_onehot(obj_labels.data, self.num_classes))
         else:
@@ -285,19 +277,29 @@ class LinearizedContext(nn.Module):
 
                 obj_dists2 = self.decoder_lin1(obj_pre_rep)
                 obj_dists2 = self.decoder_lin2(obj_dists2.view(-1, 1, 1024), 1)
+
+                obj_dists2 = obj_dists2[1]
+
                 obj_dists2 = self.decoder_lin3(obj_dists2.view(-1, 1024))
+
             else:
                 # this is for sgdet
 
                 obj_dists2 = self.decoder_lin1(obj_pre_rep)
+
                 perm, inv_perm, ls_transposed = self.sort_rois(im_inds.data, None, box_priors)
                 obj_dists2 = obj_dists2[perm].contiguous()
                 obj_dists2 = PackedSequence(obj_dists2, torch.tensor(ls_transposed))
                 obj_dists2, lengths1 = pad_packed_sequence(obj_dists2, batch_first=False)
-                obj_dists2 = self.decoder_lin2(obj_dists2.view(-1, batch_size, 1024), batch_size)
+
+
+                obj_dists2 = self.decoder_lin2(obj_dists2.view(-1, batch_size, 1024), batch_size)[1]
+
+
                 obj_dists2, _ = pack_padded_sequence(obj_dists2, lengths1, batch_first=False)
                 obj_dists2 = self.decoder_lin3(obj_dists2.view(-1, 1024))
                 obj_dists2 = obj_dists2[inv_perm]
+
 
                 if (not self.training and not self.mode == 'gtbox') or self.mode in ('sgdet', 'refinerels'):
                     # try: dont apply nms here, but after own obj_classifier
@@ -350,7 +352,6 @@ class LinearizedContext(nn.Module):
                 # obj_preds = obj_dists2[:, 1:].max(1)[1] + 1
             else:
                 obj_preds = obj_labels if obj_labels is not None else obj_dists2[:, 1:].max(1)[1] + 1
-                # use_predicted label
 
         if self.mode == 'sgdet':
             return obj_dists2, obj_preds, im_inds, box_priors, rm_obj_labels, rois, nms_boxes
@@ -358,89 +359,21 @@ class LinearizedContext(nn.Module):
             return obj_dists2, obj_preds
 
 
-class odeFunc1(nn.Module):
-    def __init__(self, bidirectional):
-        super(odeFunc1, self).__init__()
 
-        self.bidirectional = bidirectional
-        if self.bidirectional:
-            self.lstm = nn.LSTM(input_size=1024, hidden_size=512, bidirectional=True)
-        else:
-            self.lstm = nn.LSTM(input_size=1024, hidden_size=1024, bidirectional=False)
-        self.nfe = 0
-        self.hidden_state = None
-
-    def init_hidden(self, batch_size):
-        # The axes semantics are (num_layers, minibatch_size, hidden_dim)
-        if self.bidirectional:
-            return (torch.zeros(2, batch_size, 512).cuda(),
-                    torch.zeros(2, batch_size, 512).cuda())
-        else:
-            return (torch.zeros(1, batch_size, 1024).cuda(),
-                    torch.zeros(1, batch_size, 1024).cuda())
-
-    def forward(self, t, x):
-        x, self.hidden_state = self.lstm(x, self.hidden_state)
-        self.nfe += 1
-        return x
-
-
-class odeFunc2(nn.Module):
-    def __init__(self, use_cuda):
-        super(odeFunc2, self).__init__()
-        self.use_cuda = use_cuda
-        self.lstm = nn.LSTM(input_size=1024, hidden_size=512, bidirectional=True)
-        self.nfe = 0
-        self.hidden_state = None
-
-    def init_hidden(self, batch_size):
-        # The axes semantics are (num_layers, minibatch_size, hidden_dim)
-        if self.use_cuda:
-            return (torch.zeros(2, batch_size, 512).cuda(),
-                    torch.zeros(2, batch_size, 512).cuda())
-        else:
-            return (torch.zeros(2, batch_size, 512),
-                    torch.zeros(2, batch_size, 512))
-
-    def forward(self, t, x):
-        x, self.hidden_state = self.lstm(x, self.hidden_state)
-        self.nfe += 1
-        return x
-
-
-class odeBlock(nn.Module):
-    def __init__(self, odeFunc):
-        super(odeBlock, self).__init__()
-        self.odeFunc = odeFunc
-        self.time = torch.tensor([0, 0.1])
-
-    def forward(self, x, batch_size):
-        self.odeFunc.hidden_state = self.odeFunc.init_hidden(batch_size)
-        self.odeFunc.nfe = 0
-        out = odeint(self.odeFunc, x, self.time, rtol=0.01, atol=0.01)
-        return out[1]
-
-
-class RelModel(nn.Module):
+class NODIS(nn.Module):
     """
     RELATIONSHIPS
     """
 
     def __init__(self, classes, rel_classes, mode='sgdet', num_gpus=1, require_overlap_det=True,
-                 embed_dim=200,
-                 use_resnet=False, order='confidence', thresh=0.01,
-                 use_proposals=False, pass_in_obj_feats_to_decoder=True,
-                 pass_in_obj_feats_to_edge=True, rec_dropout=0.0):
+                 embed_dim=200, use_resnet=False, order='confidence', thresh=0.01, use_proposals=False):
 
         """
         :param classes: Object classes
         :param rel_classes: Relationship classes. None if were not using rel mode
         :param mode: (sgcls, predcls, or sgdet)
-        :param num_gpus: how many GPUS 2 use
-        :param require_overlap_det: Whether two objects must intersect
-        :param embed_dim: Dimension for all embeddings
         """
-        super(RelModel, self).__init__()
+        super(NODIS, self).__init__()
         self.classes = classes
         self.rel_classes = rel_classes
         self.num_gpus = num_gpus
@@ -465,13 +398,7 @@ class RelModel(nn.Module):
             max_per_img=64,
         )
 
-        self.context = LinearizedContext(self.classes, self.rel_classes, mode=self.mode,
-                                         embed_dim=self.embed_dim,
-                                         obj_dim=self.obj_dim,
-                                         dropout_rate=rec_dropout,
-                                         order=order,
-                                         pass_in_obj_feats_to_decoder=pass_in_obj_feats_to_decoder,
-                                         pass_in_obj_feats_to_edge=pass_in_obj_feats_to_edge)
+        self.context = O_NODE(self.classes, self.rel_classes, mode=self.mode, embed_dim=self.embed_dim, obj_dim=self.obj_dim, order=order)
 
         # Image Feats (You'll have to disable if you want to turn off the features from here)
         self.union_boxes = UnionBoxesAndFeats(pooling_size=self.pooling_size, stride=16,
@@ -484,15 +411,6 @@ class RelModel(nn.Module):
                 Flattener(),
             )
         else:
-            '''
-            roi_fmap = [
-                Flattener(),
-                load_vgg(use_dropout=False, use_relu=False, use_linear=pooling_dim == 4096, pretrained=False).classifier,
-            ]
-            if pooling_dim != 4096:
-                roi_fmap.append(nn.Linear(4096, pooling_dim))
-            self.roi_fmap = nn.Sequential(*roi_fmap)
-            '''
             self.roi_fmap_obj = load_vgg(pretrained=False).classifier
             self.roi_avg_pool = nn.AvgPool2d(kernel_size=7, stride=0)
         ###################################
@@ -503,17 +421,12 @@ class RelModel(nn.Module):
         self.obj_embed2 = nn.Embedding(self.num_classes, self.embed_dim)
         self.obj_embed2.weight.data = embed_vecs.clone()
 
-
-
         self.lstm_visual = nn.LSTM(input_size=1536, hidden_size=512)
         self.lstm_semantic = nn.LSTM(input_size=400, hidden_size=512)
         self.odeBlock = odeBlock(odeFunc1(bidirectional=True))
-        #self.odeBlock = nn.LSTM(input_size=1024, hidden_size=512, bidirectional=True)
-
 
         self.fc_predicate = nn.Sequential(nn.Linear(1024, 512),
                                           nn.ReLU(inplace=False),
-                                          # nn.BatchNorm1d(512,momentum=0.1),
                                           nn.Linear(512, 51),
                                           nn.ReLU(inplace=False))
 
@@ -544,7 +457,7 @@ class RelModel(nn.Module):
         cxcywh = center_size(box_priors)
         if self.order == 'size':
             sizes = cxcywh[:, 2] * cxcywh[:, 3]
-            # sizes = (box_priors[:, 2] - box_priors[:, 0] + 1) * (box_priors[:, 3] - box_priors[:, 1] + 1)
+            # sizes = (box_priors[:, 2.0] - box_priors[:, 0] + 1) * (box_priors[:, 3] - box_priors[:, 1] + 1)
             assert sizes.min() > 0.0
             scores = sizes / (sizes.max() + 1)
         elif self.order == 'confidence':
@@ -628,8 +541,8 @@ class RelModel(nn.Module):
 
         Training parameters:
         :param gt_boxes: [num_gt, 4] GT boxes over the batch.
-        :param gt_classes: [num_gt, 2] gt boxes where each one is (img_id, class)
-        :param train_anchor_inds: a [num_train, 2] array of indices for the anchors that will
+        :param gt_classes: [num_gt, 2.0] gt boxes where each one is (img_id, class)
+        :param train_anchor_inds: a [num_train, 2.0] array of indices for the anchors that will
                                   be used to compute the training loss. Each (img_ind, fpn_idx)
         :return: If train:
             scores, boxdeltas, labels, boxes, boxtargets, rpnscores, rpnboxes, rellabels
@@ -639,9 +552,8 @@ class RelModel(nn.Module):
 
         """
         '---------gt_rel process----------'
-        # gt_rels[gt_rels[:, 3] == 49, 3] = 48#integrate 'wearing' and 'wears'
 
-        batch_size = x.shape[0]  # gt_rels[:,0][-1]+1 #when test mAP delete
+        batch_size = x.shape[0]
 
         result = self.detector(x, im_sizes, image_offset, gt_boxes, gt_classes, gt_rels, proposals,
                                train_anchor_inds, return_fmap=True)
@@ -649,13 +561,13 @@ class RelModel(nn.Module):
             return ValueError("heck")
 
 
-        # Prevent gradients from flowing back into score_fc from elsewhere
+        # Prevent gradients from flowing back into score_fc from elsewhere   the last 3 is bullshit
         if self.mode == 'sgdet':
             im_inds = result.im_inds - image_offset  # all indices
             boxes = result.od_box_priors  # all boxes
             rois = torch.cat((im_inds[:, None].float(), boxes), 1)
             result.obj_fmap = self.obj_feature_map(result.fmap.detach(), rois)
-            result.rm_obj_dists, result.obj_preds,  im_inds, result.rm_box_priors, result.rm_obj_labels, rois, result.boxes_all\
+            result.rm_obj_dists, result.obj_preds,  im_inds, result.rm_box_priors, result.rm_obj_labels, rois, result.boxes_all, \
                 = self.context(
                 result.obj_fmap,
                 result.rm_obj_dists.detach(),
@@ -665,18 +577,18 @@ class RelModel(nn.Module):
 
             boxes = result.rm_box_priors
         else:
+            #sgcls and predcls
             im_inds = result.im_inds - image_offset
             boxes = result.rm_box_priors
             rois = torch.cat((im_inds[:, None].float(), boxes), 1)
             result.obj_fmap = self.obj_feature_map(result.fmap.detach(), rois)
+
             result.rm_obj_dists, result.obj_preds = self.context(
                 result.obj_fmap,
                 result.rm_obj_dists.detach(),
                 im_inds, result.rm_obj_labels if self.training or self.mode == 'predcls' else None,
                 boxes.data, result.boxes_all, batch_size,
                 None, None, None, None, None, None)
-
-
 
         if self.training and result.rel_labels is None:
             assert self.mode == 'sgdet'
@@ -686,8 +598,6 @@ class RelModel(nn.Module):
                                                 num_sample_per_gt=1)
 
         rel_inds = self.get_rel_inds(result.rel_labels, im_inds, boxes)
-
-        # return result
 
         # visual part
         obj_pooling = self.obj_avg_pool(result.fmap.detach(), rois).view(-1, 512)
@@ -718,38 +628,17 @@ class RelModel(nn.Module):
         self.hidden_state_semantic = self.init_hidden(batch_size, bidirectional=False)
 
         output1, self.hidden_state_visual = self.lstm_visual(inputs1, self.hidden_state_visual)
-        output2, self.hidden_state_semantic = self.lstm_semantic(inputs2, self.hidden_state_semantic)
-
+        output2, self.hidden_state_semantic = self.lstm_semantic(inputs2, self.hidden_state_semantic)        
         inputs = torch.cat((output1, output2), 2)
+
+
         x_fusion = self.odeBlock(inputs, batch_size)
-        #self.hidden_x_fusion = (torch.zeros(2, batch_size, 512).cuda(),
-        #                        torch.zeros(2, batch_size, 512).cuda())
-        #x_fusion, self.hidden_x_fusion = self.odeBlock(inputs, self.hidden_x_fusion)
+        x_fusion = x_fusion[1]
 
         x_fusion, _ = pack_padded_sequence(x_fusion, lengths1, batch_first=False)
         x_out = self.fc_predicate(x_fusion)
         result.rel_dists = x_out[inv_perm]  # for evaluation and crossentropy
-        '''
-        dont use ranking loss
-        x_out_ranking = PackedSequence(x_out, torch.tensor(ls_transposed))
-        x_out_ranking, _ = pad_packed_sequence(x_out_ranking, batch_first=False)
-        result.ranking_dists = x_out_ranking.permute(1, 0, 2).contiguous().view(batch_size,-1)  # this dist is after ordering
-        # get marginloss target
-        if self.training:
-            rel_labs = result.rel_labels[:, 3]
-            rel_labs = rel_labs[perm].contiguous()
-            rel_labs = PackedSequence(rel_labs, torch.tensor(ls_transposed))
-            rel_labs, _ = pad_packed_sequence(rel_labs, batch_first=False)
-            rel_labs = rel_labs.cpu().numpy()
 
-            ranking_labels = -1 * np.ones((batch_size, rel_labs.shape[0] * 51))
-            for i in range(batch_size):
-                pos_idx = 0
-                for ii in range(rel_labs.shape[0]):
-                    ranking_labels[i, pos_idx] = ii * 51 + rel_labs[ii, i]
-                    pos_idx += 1
-            result.ranking_labels = torch.tensor(ranking_labels, dtype=torch.int64).cuda()
-        '''
         if self.training:
             return result
 

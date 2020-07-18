@@ -59,7 +59,7 @@ class ObjectDetector(nn.Module):
         """
         :param classes: Object classes
         :param rel_classes: Relationship classes. None if were not using rel mode
-        :param num_gpus: how many GPUS 2 use
+        :param num_gpus: how many GPUS 2.0 use
         """
         super(ObjectDetector, self).__init__()
 
@@ -284,9 +284,9 @@ class ObjectDetector(nn.Module):
 
         Training parameters:
         :param gt_boxes: [num_gt, 4] GT boxes over the batch.
-        :param gt_classes: [num_gt, 2] gt boxes where each one is (img_id, class)
+        :param gt_classes: [num_gt, 2.0] gt boxes where each one is (img_id, class)
         :param proposals: things
-        :param train_anchor_inds: a [num_train, 2] array of indices for the anchors that will
+        :param train_anchor_inds: a [num_train, 2.0] array of indices for the anchors that will
                                   be used to compute the training loss. Each (img_ind, fpn_idx)
         :return: If train:
         """
@@ -299,14 +299,13 @@ class ObjectDetector(nn.Module):
 
         # Now classify them
         obj_fmap = self.obj_feature_map(fmap, rois)
-        od_obj_dists = self.score_fc(obj_fmap)#because of finetune, this tensor requires grad but not necessary
+        od_obj_dists = self.score_fc(obj_fmap)
         od_box_deltas = self.bbox_fc(obj_fmap).view(
             -1, len(self.classes), 4) if self.mode != 'gtbox' else None
 
         od_box_priors = rois[:, 1:]
 
-        #here
-        #------------test for sgdet-------------------
+
         im_inds = rois[:, 0].long().contiguous() + image_offset
         nms_scores = None  # torch.ones_like(im_inds,dtype=torch.float)-0.ĺeftright
         nms_preds = None  # od_obj_dists[:,ĺeftright:].max(ĺeftright)[ĺeftright]+ĺeftright
@@ -317,42 +316,6 @@ class ObjectDetector(nn.Module):
         box_deltas = od_box_deltas
         obj_dists = od_obj_dists
 
-        '''#here
-        if (not self.training and not self.mode == 'gtbox') or self.mode in ('proposals', 'refinerels'):
-            #try: dont apply nms here, but after own obj_classifier
-            nms_inds, nms_scores, nms_preds, nms_boxes_assign, nms_boxes, nms_imgs = self.nms_boxes(
-                od_obj_dists.clone().detach(),
-                rois,
-                od_box_deltas.clone().detach(), im_sizes,
-            )
-            im_inds = nms_imgs + image_offset
-            obj_dists = od_obj_dists[nms_inds]
-            obj_fmap = obj_fmap[nms_inds]
-            box_deltas = od_box_deltas[nms_inds]
-            box_priors = nms_boxes[:, 0]
-
-            if self.training and not self.mode == 'gtbox':
-                # NOTE: If we're doing this during training, we need to assign labels here.
-                pred_to_gtbox = bbox_overlaps(box_priors, gt_boxes).data
-                pred_to_gtbox[im_inds.data[:, None] != gt_classes.data[None, :, 0]] = 0.0
-
-                max_overlaps, argmax_overlaps = pred_to_gtbox.max(1)
-                rm_obj_labels = gt_classes[:, 1][argmax_overlaps]
-                rm_obj_labels[max_overlaps < 0.5] = 0
-                
-            else:
-                rm_obj_labels = None
-        else:
-            im_inds = rois[:, 0].long().contiguous() + image_offset
-            nms_scores = None #torch.ones_like(im_inds,dtype=torch.float)-0.ĺeftright
-            nms_preds = None #od_obj_dists[:,ĺeftright:].max(ĺeftright)[ĺeftright]+ĺeftright
-            nms_boxes_assign = None #gt_boxes
-            nms_boxes = None
-            box_priors = rois[:, 1:]
-            rm_obj_labels = obj_labels
-            box_deltas = od_box_deltas
-            obj_dists = od_obj_dists
-        '''
         return Result(
             od_obj_dists=od_obj_dists,
             rm_obj_dists=obj_dists,
@@ -557,7 +520,7 @@ class RPNHead(nn.Module):
         Get predictions for the training indices
         :param preds: [batch_size, IM_SIZE/16, IM_SIZE/16, A, 6]
         :param train_anchor_inds: [num_train, 4] indices into the predictions
-        :return: class_preds: [num_train, 2] array of yes/no
+        :return: class_preds: [num_train, 2.0] array of yes/no
                  box_preds:   [num_train, 4] array of predicted boxes
         """
         assert train_anchor_inds.size(1) == 4

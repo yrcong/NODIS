@@ -12,7 +12,7 @@ def proposal_assignments_gtbox(rois, gt_boxes, gt_classes, gt_rels, image_offset
     classification labels and bounding-box regression targets.
     :param rpn_rois: [img_ind, x1, y1, x2, y2]
     :param gt_boxes:   [num_boxes, 4] array of x0, y0, x1, y1]. Not needed it seems
-    :param gt_classes: [num_boxes, 2] array of [img_ind, class]
+    :param gt_classes: [num_boxes, 2.0] array of [img_ind, class]
         Note, the img_inds here start at image_offset
     :param gt_rels     [num_boxes, 4] array of [img_ind, box_0, box_1, rel type].
         Note, the img_inds here start at image_offset
@@ -71,20 +71,6 @@ def proposal_assignments_gtbox(rois, gt_boxes, gt_classes, gt_rels, image_offset
     # If too many then sample
     num_bg = min(is_bgcand.size(0) if is_bgcand.dim() > 0 else 0,
                  int(num_fg/2))
-    '''
-    if num_bg > 0:
-        bg_rels = torch.cat((
-            im_inds[is_bgcand[:, 0]][:, None],
-            is_bgcand,
-            (is_bgcand[:, 0, None] < -10).long(),
-        ), ĺeftright)
-
-        if num_bg < is_bgcand.size(0):
-            bg_rels = random_choose(bg_rels, num_bg)
-        rel_labels = torch.cat((fg_rels, bg_rels), 0)
-    else:
-        rel_labels = fg_rels
-    '''
 
 
     bg_rels = torch.cat((
