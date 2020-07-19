@@ -30,15 +30,15 @@ Here is the pytorch code for our paper [NODIS: Neural Ordinary Differential Scen
 You can train the NODIS model with train_rel.py. We trained the model on a GTX 1080Ti.
 + For PredCLS: 
 ```python
-python train_rel.py -m predcls -order random -b 6 -p 100 -lr 1e-4 -ngpu 1 -ckpt checkpoints/vgdet/vg-24.tar -save_dir checkpoints/ -nepoch 20
+python train_rels.py -m predcls -order random -b 6 -p 100 -lr 1e-4 -ngpu 1 -ckpt checkpoints/vgdet/vg-24.tar -save_dir checkpoints/ -nepoch 20
 ```
 + For SGCLS: 
 ```python
-python train_rel.py -m sgcls -order random -b 6 -p 100 -lr 1e-4 -ngpu 1 -ckpt checkpoints/vgdet/vg-24.tar -save_dir checkpoints/ -nepoch 20
+python train_rels.py -m sgcls -order random -b 6 -p 100 -lr 1e-4 -ngpu 1 -ckpt checkpoints/vgdet/vg-24.tar -save_dir checkpoints/ -nepoch 20
 ```
 + For SGGEN: 
 ```python
-python train_rel.py -m sgdet -order random -b 6 -p 100 -lr 1e-4 -ngpu 1 -ckpt $CHECKPOINT -save_dir checkpoints/ -nepoch 20
+python train_rels.py -m sgdet -order random -b 6 -p 100 -lr 1e-4 -ngpu 1 -ckpt $CHECKPOINT -save_dir checkpoints/ -nepoch 20
 ```
 
 
@@ -46,15 +46,15 @@ python train_rel.py -m sgdet -order random -b 6 -p 100 -lr 1e-4 -ngpu 1 -ckpt $C
 You can evaluate the model trained by yourself.
 + For PredCLS: 
 ```python
-python eval_rel.py -m predcls -order random -b 6 -p 100 -lr 1e-3 -ngpu 1 -test -ckpt $CHECKPOINT -nepoch 50
+python eval_rels.py -m predcls -order random -b 6 -p 100 -lr 1e-3 -ngpu 1 -test -ckpt $CHECKPOINT -nepoch 50
 ```
 + For SGCLS: 
 ```python
-python eval_rel.py -m sgcls -order random -b 6 -p 100 -lr 1e-3 -ngpu 1 -test -ckpt $CHECKPOINT -nepoch 50
+python eval_rels.py -m sgcls -order random -b 6 -p 100 -lr 1e-3 -ngpu 1 -test -ckpt $CHECKPOINT -nepoch 50
 ```
 + For SGGEN: 
 ```python
-python eval_rel.py -m sgdet -order random -b 6 -p 100 -lr 1e-3 -ngpu 1 -test -ckpt $CHECKPOINT -nepoch 50
+python eval_rels.py -m sgdet -order random -b 6 -p 100 -lr 1e-3 -ngpu 1 -test -ckpt $CHECKPOINT -nepoch 50
 ```
 or you can download the pretrained NODIS PREDCLS/[SGCLS](https://drive.google.com/file/d/1CnZpAas29aayQLDBf5brQkIIexI952gI/view?usp=sharing)/SGGEN here.
 
