@@ -56,7 +56,7 @@ python eval_rels.py -m sgcls -order random -b 6 -p 100 -lr 1e-3 -ngpu 1 -test -c
 ```python
 python eval_rels.py -m sgdet -order random -b 6 -p 100 -lr 1e-3 -ngpu 1 -test -ckpt $CHECKPOINT -nepoch 50
 ```
-or you can download the pretrained NODIS PREDCLS/[SGCLS](https://drive.google.com/file/d/1CnZpAas29aayQLDBf5brQkIIexI952gI/view?usp=sharing)/SGGEN here.
+or you can download the pretrained NODIS PREDCLS/[SGCLS](https://drive.google.com/file/d/1CnZpAas29aayQLDBf5brQkIIexI952gI/view?usp=sharing)/[SGGEN](https://drive.google.com/file/d/1cSj4SX80P5B8wb-5bISJJKCCVziIUqvQ/view?usp=sharing) here.
 
 ## Help
 This is a draft version, if you find any problem, please contact with us.
